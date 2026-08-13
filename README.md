@@ -2,7 +2,9 @@
 
 终端 AI 助手（Coding Agent 方向的一期工程）：在终端里与大模型进行**流式多轮对话**，支持 OpenAI 与 Anthropic 两种协议，可接入任何兼容端点（Kimi、DeepSeek、GLM 等）。
 
-启动 Banner：动漫女孩图案 + `JasonCode` 标识 + 版本/供应商信息（图案位于 `src/main/resources/banner.txt`）。
+启动 Banner：动漫女孩图案 + `JasonCode` 标识 + 版本/供应商信息。
+
+**自定义 Banner 图案**：把任意字符画文本存为 `~/.jasoncode/banner.txt` 即可替换（免重新打包）；不存在时使用出厂内置图案（`src/main/resources/banner.txt`）。
 
 ## 一期功能
 

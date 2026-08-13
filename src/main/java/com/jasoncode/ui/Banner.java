@@ -4,14 +4,20 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 /**
  * 启动 Banner（F3）：动漫女孩图案 + 清晰的程序名 + 软件信息区（版本、定位）
- * + 当前生效供应商/模型。图案存放于 classpath 的 banner.txt，换图不动代码。
+ * + 当前生效供应商/模型。
+ * <p>
+ * 图案加载优先级：外部文件 {@code ~/.jasoncode/banner.txt}（可手动替换，免重新打包）
+ * → classpath 内置 banner.txt（出厂默认）。
  */
 public final class Banner {
 
     private static final String ART_RESOURCE = "/banner.txt";
+    static final String EXTERNAL_ART_FILENAME = "banner.txt";
 
     private Banner() {
     }
@@ -28,8 +34,28 @@ public final class Banner {
         out.flush();
     }
 
-    /** 读取图案资源；缺失时降级为纯文字，不阻断启动。 */
+    /** 用户目录下的自定义图案路径：~/.jasoncode/banner.txt。 */
+    public static Path externalArtPath(Path homeDir) {
+        return homeDir.resolve(".jasoncode").resolve(EXTERNAL_ART_FILENAME);
+    }
+
+    /** 加载图案：外部自定义文件优先，缺失时回退内置资源；均失败时降级为纯文字。 */
     static String loadArt() {
+        return loadArt(Path.of(System.getProperty("user.home")));
+    }
+
+    static String loadArt(Path homeDir) {
+        Path external = externalArtPath(homeDir);
+        try {
+            if (Files.exists(external)) {
+                String content = Files.readString(external, StandardCharsets.UTF_8);
+                if (!content.isBlank()) {
+                    return content;
+                }
+            }
+        } catch (IOException e) {
+            // 读取失败回退内置图案，不阻断启动
+        }
         try (InputStream in = Banner.class.getResourceAsStream(ART_RESOURCE)) {
             if (in == null) {
                 return "JasonCode";
