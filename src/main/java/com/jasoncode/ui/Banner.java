@@ -40,7 +40,7 @@ public final class Banner {
     }
 
     /** 加载图案：外部自定义文件优先，缺失时回退内置资源；均失败时降级为纯文字。 */
-    static String loadArt() {
+    public static String loadArt() {
         return loadArt(Path.of(System.getProperty("user.home")));
     }
 

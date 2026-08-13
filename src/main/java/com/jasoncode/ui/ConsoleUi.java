@@ -10,7 +10,6 @@ import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.ParsedLine;
 import org.jline.reader.UserInterruptException;
 import org.jline.terminal.Terminal;
-import org.jline.terminal.TerminalBuilder;
 import org.jline.utils.AttributedString;
 import org.jline.utils.AttributedStringBuilder;
 import org.jline.utils.AttributedStyle;
@@ -23,11 +22,11 @@ import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 /**
- * 终端门面：Banner、带色提示符输入（含 ↑/↓ 历史、输入背景色、/ 命令补全）、
- * 输入框上方状态行、错误/警告输出。
+ * 行模式终端门面（管道/哑终端降级路径，F3）：Banner、带色提示符输入（含 ↑/↓ 历史、
+ * 输入背景色、/ 命令补全）、输入框上方状态行、错误/警告输出。
  * <p>
- * 基于 JLine：close 时恢复终端状态（N8）；管道环境自动降级为 dumb terminal。
- * 全部输出经 {@link IndentingWriter} 统一左侧留白（F3）。
+ * Terminal 由调用方（Main）创建并传入（与全屏模式共用同一个终端）；close 时
+ * 恢复终端状态（N8）。全部输出经 {@link IndentingWriter} 统一左侧留白。
  */
 public final class ConsoleUi implements ChatUi, AutoCloseable {
 
@@ -43,12 +42,9 @@ public final class ConsoleUi implements ChatUi, AutoCloseable {
     private volatile Collection<ChatCommand> commands = List.of();
     private volatile Supplier<String> statusInfo;
 
-    public ConsoleUi(AnsiColors colors) throws IOException {
+    public ConsoleUi(Terminal terminal, AnsiColors colors) {
         this.colors = colors;
-        this.terminal = TerminalBuilder.builder()
-                .system(true)
-                .dumb(true) // 管道/非交互环境降级为 dumb terminal，不产生乱码
-                .build();
+        this.terminal = terminal;
         this.out = new PrintWriter(new IndentingWriter(terminal.writer(), INDENT), false);
         this.prompt = buildPrompt();
         this.lineReader = LineReaderBuilder.builder()

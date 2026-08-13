@@ -1,5 +1,6 @@
 package com.jasoncode;
 
+import com.jasoncode.chat.ChatEngine;
 import com.jasoncode.chat.Conversation;
 import com.jasoncode.chat.ConversationLoop;
 import com.jasoncode.chat.command.CommandRegistry;
@@ -14,8 +15,14 @@ import com.jasoncode.provider.ChatMessage;
 import com.jasoncode.provider.ChatProvider;
 import com.jasoncode.provider.ProviderFactory;
 import com.jasoncode.ui.AnsiColors;
+import com.jasoncode.ui.Banner;
 import com.jasoncode.ui.ConsoleUi;
 import com.jasoncode.ui.StreamRenderer;
+import com.jasoncode.ui.tui.ChatScreen;
+import com.jasoncode.ui.tui.LanternaTui;
+import com.jasoncode.ui.tui.ScreenItem;
+import org.jline.terminal.Terminal;
+import org.jline.terminal.TerminalBuilder;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -31,12 +38,12 @@ import java.util.concurrent.Callable;
 @Command(
         name = "jasoncode",
         mixinStandardHelpOptions = true,
-        version = "JasonCode 0.2.0（一期工程：终端流式对话）",
+        version = "JasonCode 0.4.0（一期工程：终端流式对话）",
         description = "终端 AI 助手：支持 OpenAI / Anthropic 协议的流式多轮对话。"
 )
 public final class Main implements Callable<Integer> {
 
-    public static final String VERSION = "0.2.0";
+    public static final String VERSION = "0.4.0";
 
     @Option(names = {"-p", "--provider"},
             description = "指定本次会话使用的供应商名（覆盖配置文件中的 default）")
@@ -86,7 +93,45 @@ public final class Main implements Callable<Integer> {
         }
 
         AnsiColors colors = new AnsiColors();
-        try (ConsoleUi ui = new ConsoleUi(colors)) {
+        Terminal terminal = TerminalBuilder.builder()
+                .system(true)
+                .dumb(true) // 管道/非交互环境降级为 dumb terminal，不产生乱码
+                .build();
+        try {
+            if (Terminal.TYPE_DUMB.equals(terminal.getType())) {
+                return runLineMode(terminal, colors, providerConfig); // 降级：逐行纯文本
+            }
+        } finally {
+            terminal.close(); // 关闭 JLine 终端，让 Lanterna 重新接管（N8）
+        }
+        return runFullScreen(providerConfig); // 交互：基于 Lanterna 的全屏 TUI
+    }
+
+    /** 全屏 TUI（F3/F5/F9）：基于 Lanterna 的三区布局 + 异步对话引擎 + 输入队列。 */
+    private int runFullScreen(ProviderConfig providerConfig) throws IOException {
+        ChatProvider provider = ProviderFactory.create(providerConfig);
+        CommandRegistry registry = CommandRegistry.defaults();
+        Conversation conversation = new Conversation(new InMemoryHistoryStore());
+        ChatScreen screen = new ChatScreen();
+        screen.addBanner(new ScreenItem.BannerItem(Banner.loadArt(), VERSION, provider.describe()));
+        // openai 协议不支持扩展思考：一次性警告，不阻断（F5）
+        if (providerConfig.thinking() && providerConfig.protocol() == Protocol.OPENAI) {
+            screen.note("⚠ openai 协议不支持扩展思考，供应商 " + providerConfig.name()
+                    + " 的 thinking 配置将被忽略");
+        }
+        try (ChatEngine engine = new ChatEngine(provider, conversation.history(), screen)) {
+            engine.start();
+            LanternaTui tui = new LanternaTui(screen, engine, registry,
+                    () -> statusLine(providerConfig, conversation));
+            tui.run();
+        }
+        return 0;
+    }
+
+    /** 行模式降级（管道/哑终端，F3）：逐行纯文本，无全屏接管。 */
+    private int runLineMode(Terminal terminal, AnsiColors colors,
+                            ProviderConfig providerConfig) throws IOException {
+        try (ConsoleUi ui = new ConsoleUi(terminal, colors)) {
             // openai 协议不支持扩展思考：一次性警告，不阻断（F5）
             if (providerConfig.thinking() && providerConfig.protocol() == Protocol.OPENAI) {
                 ui.showWarning("openai 协议不支持扩展思考，供应商 " + providerConfig.name()

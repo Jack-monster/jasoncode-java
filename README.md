@@ -1,21 +1,23 @@
 # JasonCode
 
-终端 AI 助手（Coding Agent 方向的一期工程）：在终端里与大模型进行**流式多轮对话**，支持 OpenAI 与 Anthropic 两种协议，可接入任何兼容端点（Kimi、DeepSeek、GLM 等）。
+终端 AI 助手（Coding Agent 方向的一期工程）：在终端里与大模型进行**流式多轮对话**，支持 OpenAI 与 Anthropic 两种协议，可接入任何兼容端点（Kimi、DeepSeek、GLM 等）。v0.4.0 起全屏 TUI 使用 [Lanterna](https://github.com/mabe02/lanterna) 实现。
 
-启动 Banner：动漫女孩图案 + `JasonCode` 标识 + 版本/供应商信息。
+启动 Banner：`JasonCode` 标识 + 版本/供应商信息。
 
 **自定义 Banner 图案**：把任意字符画文本存为 `~/.jasoncode/banner.txt` 即可替换（免重新打包）；不存在时使用出厂内置图案（`src/main/resources/banner.txt`）。
 
 ## 一期功能
 
-- 交互式终端对话界面（Banner、带色提示符 `You ❯`、输入文本背景色区分、↑/↓ 输入历史、`/` + Tab 命令补全）
-- 输入框上方状态行：当前供应商/模型、对话轮次、上下文占用，每轮刷新
+- 全屏交互式 TUI（基于 Lanterna，接管备用屏幕，退出自动恢复）：对话历史区 + 单条状态栏 + 固定底部输入框，Agent 输出不覆盖输入框
+- 带色提示符 `You ❯`、输入文本背景色区分、↑/↓ 输入历史、Shift+Enter/Ctrl+Enter/Alt+Enter 多行输入、`/` + Tab 命令补全
+- 状态栏就地刷新：当前供应商/模型、对话轮次、上下文占用、生成状态与队列深度
 - SSE 流式输出：回复逐块实时打印，首字节即上屏
-- extended thinking 分块展示：`✦ Thinking` 思考块（暗色）与 `── Answer ──` 正文块结构分离
+- extended thinking 可折叠块：思考中黄色“思考中...”实时展示；完成后收起为“思考内容”，鼠标点击标题展开/收起；与正文以空间结构（缩进、边界线、空行）区分
+- 输入队列：生成中可继续提交，未消费 prompt 以 queued 标记展示，消费时自动合并为一条请求
 - 多轮对话记忆（会话内），退出即清空
 - 统一 Provider 抽象：新增协议后端只需新增实现类
 - 密钥安全：任何输出中不出现完整 API key（最多末四位）
-- 管道/非终端环境自动降级为纯文本，退出时恢复终端状态
+- 管道/非终端环境自动降级为逐行纯文本，退出时恢复终端状态
 
 ## 环境要求
 
@@ -26,8 +28,14 @@
 
 ```bash
 mvn package          # 产物：target/jasoncode.jar（fat jar）
-mvn test             # 运行全部单元测试（31 个）
+mvn test             # 运行全部单元测试（65 个）
 ```
+
+## UI 技术栈
+
+- 全屏 TUI：[Lanterna](https://github.com/mabe02/lanterna) 3.1.3（Screen/输入/鼠标/尺寸事件统一处理）
+- 行模式降级：JLine 3.26.3（管道/哑终端纯文本输入）
+- 颜色与换行：内置 `Style` / `StyledLine` / `TextWrap`（CJK 双列宽度）
 
 ## 配置
 
@@ -93,8 +101,9 @@ src/main/java/com/jasoncode/
 │   ├── openai/               — OpenAI 协议实现
 │   └── anthropic/            — Anthropic 协议实现（含 extended thinking）
 ├── history/                  — 历史存储抽象（一期内存实现，预留持久化接口）
-├── chat/                     — 对话循环与可扩展命令系统
-└── ui/                       — JLine 终端交互 + 事件队列流式渲染
+├── chat/                     — 异步对话引擎（输入队列合并）+ 命令系统
+└── ui/                       — 行模式降级 UI + 事件队列流式渲染
+    └── tui/                  — 全屏 TUI：屏幕模型、可折叠块、宽度感知换行、LanternaTui
 ```
 
 ## 文档

@@ -31,7 +31,7 @@ class BannerTest {
     void fallsBackToBuiltinResourceWhenExternalMissing() {
         String art = Banner.loadArt(homeDir);
 
-        assertTrue(art.contains("%"), "内置图案应包含动漫女孩字符画");
+        assertTrue(art.contains("█"), "内置图案应包含 Banner 字符");
     }
 
     @Test
@@ -40,6 +40,6 @@ class BannerTest {
         Files.createDirectories(external.getParent());
         Files.writeString(external, "   \n  ");
 
-        assertTrue(Banner.loadArt(homeDir).contains("%"), "空白自定义文件应回退内置图案");
+        assertTrue(Banner.loadArt(homeDir).contains("█"), "空白自定义文件应回退内置图案");
     }
 }
