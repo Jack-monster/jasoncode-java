@@ -10,6 +10,7 @@ public final class AnsiColors {
     private static final String CYAN_CODE = "\u001B[36m";
     private static final String RED_CODE = "\u001B[31m";
     private static final String YELLOW_CODE = "\u001B[33m";
+    private static final String MAGENTA_CODE = "\u001B[35m";
     private static final String BOLD_CODE = "\u001B[1m";
 
     private final boolean enabled;
@@ -41,6 +42,10 @@ public final class AnsiColors {
 
     public String yellow(String text) {
         return wrap(YELLOW_CODE, text);
+    }
+
+    public String magenta(String text) {
+        return wrap(MAGENTA_CODE, text);
     }
 
     public String bold(String text) {

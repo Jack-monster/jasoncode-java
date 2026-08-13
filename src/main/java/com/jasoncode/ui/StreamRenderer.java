@@ -27,6 +27,7 @@ public final class StreamRenderer implements StreamEventListener, AutoCloseable 
     private final StringBuilder turnText = new StringBuilder();
     private volatile CountDownLatch turnLatch;
     private Thread renderThread;
+    private boolean thinkingBlockOpen;
 
     public StreamRenderer(PrintWriter out, AnsiColors colors) {
         this.out = out;
@@ -40,11 +41,12 @@ public final class StreamRenderer implements StreamEventListener, AutoCloseable 
         renderThread.start();
     }
 
-    /** 新一轮对话前调用：重置本轮累积文本与完成信号。 */
+    /** 新一轮对话前调用：重置本轮累积文本、块状态与完成信号。 */
     public void beginTurn() {
         synchronized (turnText) {
             turnText.setLength(0);
         }
+        thinkingBlockOpen = false;
         turnLatch = new CountDownLatch(1);
     }
 
@@ -104,11 +106,22 @@ public final class StreamRenderer implements StreamEventListener, AutoCloseable 
     private void render(StreamEvent event) {
         switch (event) {
             case StreamEvent.ThinkingDelta delta -> {
-                // 思考内容与正文视觉区分（N5）：暗色输出
+                // 思考块（F5 分块展示）：首个思考片段前打印标题行，内容暗色输出
+                if (!thinkingBlockOpen) {
+                    thinkingBlockOpen = true;
+                    out.println();
+                    out.println(colors.dim("✦ Thinking"));
+                }
                 out.print(colors.dim(delta.text()));
                 out.flush();
             }
             case StreamEvent.TextDelta delta -> {
+                // 思考块结束后打印分隔线，正文另起一块（F5）
+                if (thinkingBlockOpen) {
+                    thinkingBlockOpen = false;
+                    out.println();
+                    out.println(colors.dim("── Answer ──────────────"));
+                }
                 synchronized (turnText) {
                     turnText.append(delta.text());
                 }

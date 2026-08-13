@@ -10,6 +10,7 @@ import com.jasoncode.config.JasonConfig;
 import com.jasoncode.config.Protocol;
 import com.jasoncode.config.ProviderConfig;
 import com.jasoncode.history.InMemoryHistoryStore;
+import com.jasoncode.provider.ChatMessage;
 import com.jasoncode.provider.ChatProvider;
 import com.jasoncode.provider.ProviderFactory;
 import com.jasoncode.ui.AnsiColors;
@@ -21,6 +22,7 @@ import picocli.CommandLine.Option;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.Callable;
 
 /**
@@ -29,10 +31,12 @@ import java.util.concurrent.Callable;
 @Command(
         name = "jasoncode",
         mixinStandardHelpOptions = true,
-        version = "JasonCode 0.1.0（一期工程：终端流式对话）",
+        version = "JasonCode 0.2.0（一期工程：终端流式对话）",
         description = "终端 AI 助手：支持 OpenAI / Anthropic 协议的流式多轮对话。"
 )
 public final class Main implements Callable<Integer> {
+
+    public static final String VERSION = "0.2.0";
 
     @Option(names = {"-p", "--provider"},
             description = "指定本次会话使用的供应商名（覆盖配置文件中的 default）")
@@ -89,17 +93,35 @@ public final class Main implements Callable<Integer> {
                         + " 的 thinking 配置将被忽略");
             }
             ChatProvider provider = ProviderFactory.create(providerConfig);
+            CommandRegistry registry = CommandRegistry.defaults();
+            Conversation conversation = new Conversation(new InMemoryHistoryStore());
+            ui.setCommands(registry.all());
+            ui.setStatusInfo(() -> statusLine(providerConfig, conversation));
             try (StreamRenderer renderer = new StreamRenderer(ui.writer(), colors)) {
                 renderer.start();
-                ui.printBanner(provider);
-                ConversationLoop loop = new ConversationLoop(
-                        ui, renderer, provider,
-                        new Conversation(new InMemoryHistoryStore()),
-                        CommandRegistry.defaults());
+                ui.printBanner(VERSION, provider.describe());
+                ConversationLoop loop = new ConversationLoop(ui, renderer, provider, conversation, registry);
                 loop.run();
             }
             return 0;
         }
+    }
+
+    /** 状态栏内容（F3）：供应商·模型（协议）│ 轮次 │ 上下文占用（历史总字符数）。 */
+    static String statusLine(ProviderConfig providerConfig, Conversation conversation) {
+        List<ChatMessage> history = conversation.history().snapshot();
+        int chars = history.stream().mapToInt(m -> m.content().length()).sum();
+        int turns = history.size() / 2;
+        return String.format("%s · %s (%s) │ 轮次: %d │ 上下文: %s",
+                providerConfig.name(), providerConfig.model(),
+                providerConfig.protocol().name().toLowerCase(), turns, humanCount(chars));
+    }
+
+    private static String humanCount(int n) {
+        if (n < 1000) {
+            return n + "字符";
+        }
+        return String.format("%.1fk字符", n / 1000.0);
     }
 
     /**
