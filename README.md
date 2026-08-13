@@ -35,7 +35,13 @@ mvn test             # 运行全部单元测试（31 个）
 
 ## 配置
 
-配置文件默认位于 `~/.jasoncode/config.yaml`，可用 `--config` 指定其他路径：
+配置文件按以下顺序查找：
+
+1. `--config` 显式指定的路径；
+2. 用户目录 `~/.jasoncode/config.yaml`；
+3. 运行目录 `./.jasoncode/config.yaml`。
+
+两处默认位置都不存在时，首次运行会在 `~/.jasoncode/config.yaml` 自动生成带注释的配置模板，填写密钥后重新运行即可：
 
 ```yaml
 default: kimi                     # 默认使用的供应商名

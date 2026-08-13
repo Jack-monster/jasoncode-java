@@ -5,6 +5,7 @@ import com.jasoncode.chat.ConversationLoop;
 import com.jasoncode.chat.command.CommandRegistry;
 import com.jasoncode.config.ConfigException;
 import com.jasoncode.config.ConfigLoader;
+import com.jasoncode.config.ConfigResolver;
 import com.jasoncode.config.JasonConfig;
 import com.jasoncode.config.Protocol;
 import com.jasoncode.config.ProviderConfig;
@@ -58,9 +59,10 @@ public final class Main implements Callable<Integer> {
     }
 
     private int run() throws IOException {
-        Path path = configPath != null
-                ? configPath
-                : Path.of(System.getProperty("user.home"), ".jasoncode", "config.yaml");
+        Path path = resolveConfigPath();
+        if (path == null) {
+            return 1; // 已生成模板并提示用户，本次不进入对话
+        }
 
         JasonConfig config;
         try {
@@ -98,5 +100,32 @@ public final class Main implements Callable<Integer> {
             }
             return 0;
         }
+    }
+
+    /**
+     * 解析配置文件路径（F1）：
+     * 显式 --config 直接用；否则按 用户目录 → 运行目录 搜索；
+     * 均不存在时在用户目录生成模板并提示填写，返回 null。
+     */
+    private Path resolveConfigPath() {
+        if (configPath != null) {
+            return configPath;
+        }
+        Path homeDir = Path.of(System.getProperty("user.home"));
+        Path workDir = Path.of("").toAbsolutePath();
+        Path found = ConfigResolver.findExisting(homeDir, workDir);
+        if (found != null) {
+            return found;
+        }
+        Path template = ConfigResolver.homeConfigPath(homeDir);
+        try {
+            ConfigResolver.createTemplate(template);
+        } catch (IOException e) {
+            System.err.println("生成配置模板失败：" + template + "（" + e.getMessage() + "）");
+            return null;
+        }
+        System.err.println("未找到配置文件，已生成模板：" + template);
+        System.err.println("请打开该文件填写 api_key 等字段，然后重新运行 JasonCode。");
+        return null;
     }
 }
