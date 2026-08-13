@@ -24,13 +24,13 @@ public final class Banner {
 
     public static void print(PrintWriter out, AnsiColors colors,
                              String version, String providerDescription) {
+        out.println(); // 顶部留白，避免贴住终端上边缘（F3）
         out.println(colors.magenta(loadArt().stripTrailing()));
         out.println();
         out.println(colors.bold(colors.cyan("JasonCode")) + "  " + colors.dim("v" + version));
         out.println("终端 AI 助手 · 一期工程（流式对话）");
         out.println("供应商：" + colors.cyan(providerDescription));
         out.println(colors.dim("输入消息开始对话；/ + Tab 查看命令；Ctrl+C 或 /exit 退出"));
-        out.println();
         out.flush();
     }
 

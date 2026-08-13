@@ -27,12 +27,17 @@ import java.util.regex.Pattern;
  * 输入框上方状态行、错误/警告输出。
  * <p>
  * 基于 JLine：close 时恢复终端状态（N8）；管道环境自动降级为 dumb terminal。
+ * 全部输出经 {@link IndentingWriter} 统一左侧留白（F3）。
  */
 public final class ConsoleUi implements ChatUi, AutoCloseable {
+
+    /** 输出左侧统一缩进（左右留白，F3）。 */
+    private static final String INDENT = "  ";
 
     private final Terminal terminal;
     private final LineReader lineReader;
     private final AnsiColors colors;
+    private final PrintWriter out;
     private final String prompt;
 
     private volatile Collection<ChatCommand> commands = List.of();
@@ -44,6 +49,7 @@ public final class ConsoleUi implements ChatUi, AutoCloseable {
                 .system(true)
                 .dumb(true) // 管道/非交互环境降级为 dumb terminal，不产生乱码
                 .build();
+        this.out = new PrintWriter(new IndentingWriter(terminal.writer(), INDENT), false);
         this.prompt = buildPrompt();
         this.lineReader = LineReaderBuilder.builder()
                 .terminal(terminal)
@@ -52,9 +58,9 @@ public final class ConsoleUi implements ChatUi, AutoCloseable {
                 .build();
     }
 
-    /** 输出 writer（StreamRenderer 用它打印流式内容）。 */
+    /** 输出 writer（StreamRenderer 用它打印流式内容，含左侧留白）。 */
     public PrintWriter writer() {
-        return terminal.writer();
+        return out;
     }
 
     /** 注册可补全的会话命令（候选列表随注册表动态变化，F3）。 */
@@ -69,7 +75,7 @@ public final class ConsoleUi implements ChatUi, AutoCloseable {
 
     /** 启动横幅：动漫女孩 Banner + 软件信息 + 当前供应商/模型（F3）。 */
     public void printBanner(String version, String providerDescription) {
-        Banner.print(terminal.writer(), colors, version, providerDescription);
+        Banner.print(out, colors, version, providerDescription);
     }
 
     /**
@@ -89,21 +95,18 @@ public final class ConsoleUi implements ChatUi, AutoCloseable {
 
     @Override
     public void showError(String message) {
-        PrintWriter out = terminal.writer();
         out.println(colors.red("✗ " + message));
         out.flush();
     }
 
     @Override
     public void showWarning(String message) {
-        PrintWriter out = terminal.writer();
         out.println(colors.yellow("⚠ " + message));
         out.flush();
     }
 
     @Override
     public void println(String message) {
-        PrintWriter out = terminal.writer();
         out.println(message);
         out.flush();
     }
@@ -118,12 +121,13 @@ public final class ConsoleUi implements ChatUi, AutoCloseable {
         }
     }
 
-    /** 固定带色提示符（F3）：You ❯；无颜色环境降级为纯文本。 */
+    /** 固定带色提示符（F3）：You ❯，随输出一起内缩；无颜色环境降级为纯文本。 */
     private String buildPrompt() {
         if (!colors.isEnabled()) {
-            return "You ❯ ";
+            return INDENT + "You ❯ ";
         }
         return new AttributedStringBuilder()
+                .append(INDENT)
                 .style(AttributedStyle.BOLD.foreground(AttributedStyle.CYAN))
                 .append("You")
                 .style(AttributedStyle.DEFAULT.foreground(AttributedStyle.CYAN))
@@ -174,8 +178,8 @@ public final class ConsoleUi implements ChatUi, AutoCloseable {
         if (info == null) {
             return;
         }
-        // 状态行紧邻输入框上方：每轮刷新模型信息与上下文占用（F3）
-        PrintWriter out = terminal.writer();
+        // 状态行紧邻输入框上方，前置空行与上一块输出分隔（F3 留白）
+        out.println();
         out.println(colors.dim("⚙ " + info.get()));
         out.flush();
     }
