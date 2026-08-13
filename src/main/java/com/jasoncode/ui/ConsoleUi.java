@@ -1,5 +1,6 @@
 package com.jasoncode.ui;
 
+import com.jasoncode.chat.ChatUi;
 import com.jasoncode.provider.ChatProvider;
 import org.jline.reader.EndOfFileException;
 import org.jline.reader.LineReader;
@@ -16,7 +17,7 @@ import java.io.PrintWriter;
  * <p>
  * 基于 JLine：close 时恢复终端状态（N8）；管道环境自动降级为 dumb terminal。
  */
-public final class ConsoleUi implements AutoCloseable {
+public final class ConsoleUi implements ChatUi, AutoCloseable {
 
     private static final String LOGO = """
               ██╗  █████╗ ███████╗  ██████╗  ██████╗ ███╗   ██╗ ██████╗ ███████╗
@@ -63,6 +64,7 @@ public final class ConsoleUi implements AutoCloseable {
      *
      * @return 用户输入；null 表示退出（EOF/Ctrl+D 或 Ctrl+C）
      */
+    @Override
     public String readLine() {
         try {
             return lineReader.readLine(colors.cyan("❯ "));
@@ -71,18 +73,21 @@ public final class ConsoleUi implements AutoCloseable {
         }
     }
 
+    @Override
     public void showError(String message) {
         PrintWriter out = terminal.writer();
         out.println(colors.red("✗ " + message));
         out.flush();
     }
 
+    @Override
     public void showWarning(String message) {
         PrintWriter out = terminal.writer();
         out.println(colors.yellow("⚠ " + message));
         out.flush();
     }
 
+    @Override
     public void println(String message) {
         PrintWriter out = terminal.writer();
         out.println(message);
