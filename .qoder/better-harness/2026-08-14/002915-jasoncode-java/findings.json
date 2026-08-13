@@ -1,0 +1,138 @@
+{
+  "summary": {
+    "projectName": "JasonCode",
+    "locale": "zh-CN",
+    "modelId": "agent-work-loop-v4",
+    "reportContractVersion": 26,
+    "overview": "项目拥有清晰的模块化架构和完整的测试覆盖，但缺少项目级 Agent 指令（AGENTS.md），导致 Agent 缺乏结构化的架构上下文和验证引导。",
+    "aiAgentPractice": {
+      "inspectedSurfaces": [],
+      "coverageRows": [
+        {
+          "surface": "Skills",
+          "scopes": [
+            "Global"
+          ],
+          "count": 2,
+          "paths": [
+            "~/.agents/skills/find-skills/SKILL.md",
+            "~/.agents/skills/spec-driven-development-skill/SKILL.md"
+          ]
+        },
+        {
+          "surface": "Rules",
+          "scopes": [
+            "Project"
+          ],
+          "count": 0
+        },
+        {
+          "surface": "Hooks",
+          "scopes": [
+            "Project"
+          ],
+          "count": 0
+        },
+        {
+          "surface": "Commands",
+          "scopes": [
+            "Project"
+          ],
+          "count": 0
+        },
+        {
+          "surface": "Custom Agents",
+          "scopes": [
+            "Project"
+          ],
+          "count": 0
+        },
+        {
+          "surface": "MCP",
+          "scopes": [
+            "Project"
+          ],
+          "count": 0
+        },
+        {
+          "surface": "Workflows",
+          "scopes": [
+            "Project"
+          ],
+          "count": 0
+        },
+        {
+          "surface": "Memories",
+          "scopes": [
+            "Project"
+          ],
+          "count": 0
+        },
+        {
+          "surface": "Plugins",
+          "scopes": [
+            "Plugin"
+          ],
+          "count": 0
+        }
+      ],
+      "repositorySourceRows": []
+    },
+    "assignmentSummaries": [],
+    "dimensions": [
+      {
+        "id": "task-understanding",
+        "label": "任务理解",
+        "score": 59,
+        "summary": "项目有完整的 spec/plan 文档体系，但缺少 AGENTS.md 导致 Agent 无法高效获取架构和模块边界等结构化上下文。",
+        "findingRefs": [
+          "missing-project-agent-instructions"
+        ]
+      },
+      {
+        "id": "controlled-execution",
+        "label": "可控执行",
+        "score": 59,
+        "summary": "Maven 构建和 fat jar 入口点清晰，但无 Agent 级启动和验证引导指令。",
+        "findingRefs": []
+      },
+      {
+        "id": "change-validation",
+        "label": "改动验证",
+        "score": 59,
+        "summary": "45 个单元测试覆盖 6 个模块，`mvn test` 验证路径存在，但无 Agent 级验证引导。",
+        "findingRefs": []
+      },
+      {
+        "id": "reliable-delivery",
+        "label": "可靠交付",
+        "score": 35,
+        "summary": "无 CI/CD 管线或外部验收边界证据，交付验收保持 Unobserved。",
+        "findingRefs": []
+      },
+      {
+        "id": "learning-capture",
+        "label": "经验沉淀",
+        "score": 35,
+        "summary": "无可分析会话证据，学习捕获的所有检查保持 Unobserved。",
+        "findingRefs": []
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "missing-project-agent-instructions",
+      "title": "Agent 缺少项目级结构化上下文引导，需从代码反推架构和约束",
+      "severity": "Medium",
+      "reason": "JasonCode 仓库（27 个 Java 源文件、6 个模块）无 AGENTS.md 或等价的项目级 Agent 指令文件。Agent 缺少关于六模块单向依赖架构、关键协议约束（如 HistoryStore.removeLast() 回滚语义、ChatProvider sealed interface 扩展模式、SSE 按行状态机设计）、验证命令（mvn test）和模块边界的结构化引导，必须从代码反推上下文，增加跨会话行为不一致的风险。",
+      "expectedOutput": [
+        "Update the existing Document owner identified by the reviewed evidence and retain a focused validation result."
+      ],
+      "expectedArtifact": "Document",
+      "aiFixPrompt": "在仓库根目录创建 AGENTS.md，包含以下项目特定事实：\n\n1. 六模块架构及单向依赖链：cli/Main → config/ProviderFactory → provider/{OpenAi,Anthropic,SseParser} ← history/HistoryStore ← chat/ConversationLoop ← ui/ConsoleUi + StreamRenderer\n2. 关键约束：HistoryStore.removeLast() 支持 Anthropic 协议失败回滚；ChatProvider 为 sealed interface，新协议需实现该接口并在 ProviderFactory 添加分支\n3. 验证命令：mvn test（45 个单元测试）\n4. 模块源文件路径和测试文件路径\n5. 指向 docs/phase-1/spec.md 和 docs/phase-1/plan.md 的引用\n\n## Validation\n\n- 确认 AGENTS.md 存在于仓库根目录\n- 确认内容涵盖架构、关键约束和验证命令",
+      "dimensionRefs": [
+        "task-understanding"
+      ]
+    }
+  ]
+}
