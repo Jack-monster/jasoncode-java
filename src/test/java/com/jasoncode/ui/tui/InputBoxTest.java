@@ -1,173 +1,199 @@
 package com.jasoncode.ui.tui;
 
+import com.williamcallahan.tui4j.term.TerminalInfo;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@link InputBox} 单元测试：输入框模型、光标移动、折行、鼠标定位。
+ * 自绘输入框 InputBox 测试：编辑操作、光标按 code point 移动、硬折行渲染、
+ * 渲染行数恒定、多行合并、历史读写。
  */
 class InputBoxTest {
 
-    @Test
-    void emptyLayoutHasOneLineWithPromptWidth() {
-        InputBox box = new InputBox();
-        box.setFocused(true);
-        InputLayout layout = box.build(80);
-
-        assertEquals(1, layout.rawLines().size());
-        assertEquals("", layout.rawLines().get(0));
-        assertEquals(0, layout.cursorRow());
-        assertEquals(TextWrap.width(InputBox.PROMPT), layout.cursorCol());
+    @BeforeAll
+    static void setupTerminalInfo() {
+        TerminalInfo.provide(() -> new TerminalInfo(false, null));
     }
 
-    @Test
-    void textWrapsAtAvailableWidth() {
+    private static InputBox box() {
         InputBox box = new InputBox();
-        box.setFocused(true);
-        // 输入一段很长的英文
-        String text = "a".repeat(200);
-        box.setText(text);
+        box.setPlaceholder("提示");
+        return box;
+    }
 
-        int contentCols = 40;
-        InputLayout layout = box.build(contentCols);
-        int promptWidth = TextWrap.width(InputBox.PROMPT);
-        int maxTextWidth = contentCols - promptWidth;
-
-        for (String line : layout.rawLines()) {
-            assertTrue(TextWrap.width(line) <= maxTextWidth,
-                    "每行文本宽度应 <= " + maxTextWidth + "，实际=" + TextWrap.width(line));
+    /** 统计渲染结果的行数（以 \n 个数计，与 view() 的 countLines 一致）。 */
+    private static int lineCount(String rendered) {
+        int count = 0;
+        for (int i = 0; i < rendered.length(); i++) {
+            if (rendered.charAt(i) == '\n') {
+                count++;
+            }
         }
+        return count;
+    }
+
+    // ── 基本编辑 ──
+
+    @Test
+    void insertAndValueRoundTrip() {
+        InputBox b = box();
+        b.insert("hello world");
+        assertEquals("hello world", b.value());
     }
 
     @Test
-    void cursorMovesLeftAndRightByCodePoint() {
-        InputBox box = new InputBox();
-        box.setFocused(true);
-        box.setText("abc");
-        assertEquals(3, box.cursor());
-
-        box.moveCursorLeft();
-        assertEquals(2, box.cursor());
-        box.moveCursorLeft();
-        assertEquals(1, box.cursor());
-        box.moveCursorRight();
-        assertEquals(2, box.cursor());
-        box.moveCursorEnd();
-        assertEquals(3, box.cursor());
-        box.moveCursorHome();
-        assertEquals(0, box.cursor());
+    void multilineInsertKeepsNewlines() {
+        InputBox b = box();
+        b.insert("line1\nline2");
+        assertEquals("line1\nline2", b.value());
     }
 
     @Test
-    void insertAndBackspaceRespectCursor() {
-        InputBox box = new InputBox();
-        box.setFocused(true);
-        box.setText("abcd");
-        box.moveCursorHome();
-        box.moveCursorRight(); // cursor = 1
-        box.insert('X');
-
-        assertEquals("aXbcd", box.text());
-        assertEquals(2, box.cursor());
-
-        box.backspace();
-        assertEquals("abcd", box.text());
-        assertEquals(1, box.cursor());
+    void insertInMiddleMovesCursorAfterInserted() {
+        InputBox b = box();
+        b.insert("ac");
+        b.cursorLeft();               // 光标在 a|c
+        b.insert("b");                // → abc，光标在 b 后
+        assertEquals("abc", b.value());
     }
 
     @Test
-    void multiLineInputProducesMultipleRows() {
-        InputBox box = new InputBox();
-        box.setFocused(true);
-        box.setText("first line");
-        box.insertNewline();
-        box.insert('X');
+    void setValueAndReset() {
+        InputBox b = box();
+        b.setValue("some text");
+        assertEquals("some text", b.value());
+        b.reset();
+        assertEquals("", b.value());
+    }
 
-        InputLayout layout = box.build(80);
-        assertEquals(2, layout.rawLines().size());
-        assertEquals("first line", layout.rawLines().get(0));
-        assertEquals("X", layout.rawLines().get(1));
+    // ── 删除与行合并 ──
+
+    @Test
+    void backspaceDeletesCharacter() {
+        InputBox b = box();
+        b.insert("abc");
+        b.backspace();
+        assertEquals("ab", b.value());
     }
 
     @Test
-    void cursorRowFollowsMultiLineLayout() {
-        InputBox box = new InputBox();
-        box.setFocused(true);
-        box.setText("first line");
-        box.insertNewline();
-        box.insertNewline();
-        box.insert('X');
-
-        InputLayout layout = box.build(80);
-        assertEquals(3, layout.rawLines().size());
-        // 光标在第三行（索引 2）
-        assertEquals(2, layout.cursorRow());
+    void backspaceAtLineStartMergesUp() {
+        InputBox b = box();
+        b.insert("ab\ncd");          // 光标在 cd 末尾
+        b.home();                     // 行 1 行首
+        b.backspace();                // 与上行合并
+        assertEquals("abcd", b.value());
     }
 
     @Test
-    void moveCursorUpDownPreservesColumn() {
-        InputBox box = new InputBox();
-        box.setFocused(true);
-        // 构造两行，每行 5 个字符
-        box.setText("12345\nabcde");
-        box.moveCursorEnd();
-        assertEquals(11, box.cursor()); // 5 + 1 + 5
-
-        // 从第二行末尾上移
-        box.moveCursorUp(80);
-        // 第二行是 "abcde"，移到同一列位置，第一行 "12345"，光标应在 "12345" 末尾
-        assertEquals(5, box.cursor());
-
-        // 下移回第二行末尾
-        box.moveCursorDown(80);
-        assertEquals(11, box.cursor());
+    void deleteAtLineEndMergesDown() {
+        InputBox b = box();
+        b.insert("ab\ncd");
+        b.home();                     // 行 1 行首
+        b.cursorUp();                 // 行 0 行首
+        b.end();                      // 行 0 行尾（ab|）
+        b.deleteForward();            // 合并下行
+        assertEquals("abcd", b.value());
     }
 
     @Test
-    void mouseClickSetsCursor() {
-        InputBox box = new InputBox();
-        box.setFocused(true);
-        box.setText("hello world");
+    void deleteForwardRemovesCharacterUnderCursor() {
+        InputBox b = box();
+        b.insert("abc");
+        b.home();                     // 光标在 a 前
+        b.deleteForward();            // 删除 a
+        assertEquals("bc", b.value());
+    }
 
-        int contentCols = 80;
-        InputLayout layout = box.build(contentCols);
-        int promptWidth = layout.promptWidth();
+    // ── 光标按 code point 移动（中文不切半字） ──
 
-        // 点击第 0 行，列在 prompt 后第 3 列，应定位到第 3 个字符（ell -> 'l' 前）
-        box.moveCursorTo(0, promptWidth + 3, contentCols);
-        assertEquals(3, box.cursor());
+    @Test
+    void cursorLeftDoesNotSplitCjk() {
+        InputBox b = box();
+        b.insert("你好");
+        b.cursorLeft();               // 光标移到"你"与"好"之间
+        b.backspace();                // 删除光标前的完整字符"你"
+        assertEquals("好", b.value());
     }
 
     @Test
-    void cjkCountedAsTwoColumns() {
-        InputBox box = new InputBox();
-        box.setFocused(true);
-        box.setText("中文字符");
-
-        InputLayout layout = box.build(80);
-        // 8 个 CJK 字符，每个 2 列，总宽度 16，仍小于可用宽度
-        assertEquals(1, layout.rawLines().size());
-        assertEquals("中文字符", layout.rawLines().get(0));
-
-        box.moveCursorEnd();
-        assertEquals(4, box.cursor()); // 4 个 CJK 字符
+    void cursorUpKeepsColumnClamped() {
+        InputBox b = box();
+        b.insert("aaaa\nbb");         // 光标在 bb 末尾（col=2）
+        b.home();                     // 行 1 行首
+        b.cursorUp();                 // 移到行 0，col 截断
+        b.end();                      // 行 0 行尾
+        assertEquals("aaaa\nbb", b.value()); // 内容不变，仅光标移动
     }
 
     @Test
-    void historyTracksUniqueEntries() {
-        InputBox box = new InputBox();
-        box.addHistory("hello");
-        box.addHistory("world");
-        box.addHistory("hello"); // 重复，不加入
+    void cursorRightWrapsToNextLine() {
+        InputBox b = box();
+        b.setValue("ab\ncd");         // 光标在 cd 末尾
+        b.home();                     // 行 1 行首
+        b.cursorUp();                 // 行 0 行首
+        b.end();                      // 行 0 行尾
+        b.cursorRight();              // 越过行尾 → 行 1 行首
+        b.insert("X");                // 在行 1 行首插入
+        assertEquals("ab\nXcd", b.value());
+    }
 
-        box.setText("current");
-        box.historyUp();
-        assertEquals("hello", box.text()); // 最后一条历史
-        box.historyUp();
-        assertEquals("world", box.text()); // 上一条历史
+    // ── 渲染：硬折行 + 行数恒定 ──
+
+    @Test
+    void longLineWrapsWithoutModifyingValue() {
+        InputBox b = box();
+        String a150 = "a".repeat(150);
+        b.insert(a150);
+        // 软折行：value 保持原样，不被插入换行符
+        assertEquals(a150, b.value());
+        // 渲染后显示为多行
+        assertTrue(b.height(40) >= 3);
+        assertTrue(b.height(40) <= 5);
+    }
+
+    @Test
+    void renderProducesExactlyHeightLines() {
+        InputBox b = box();
+        b.insert("a".repeat(150));
+        int width = 40;
+        String rendered = b.render(width);
+        int height = b.height(width);
+        assertEquals(height, lineCount(rendered),
+                "渲染行数必须恒等于 height，防止 diff 截断残影");
+        assertTrue(rendered.endsWith("\n"), "渲染结果以换行结尾");
+    }
+
+    @Test
+    void emptyContentRendersPlaceholderAndMinHeight() {
+        InputBox b = box();
+        int width = 40;
+        String rendered = b.render(width);
+        assertTrue(rendered.contains("提示"));
+        assertEquals(b.height(width), lineCount(rendered));
+        assertTrue(b.height(width) >= 3);
+    }
+
+    @Test
+    void renderContainsPromptAndCursor() {
+        InputBox b = box();
+        b.insert("hi");
+        String rendered = b.render(40);
+        assertTrue(rendered.contains("┃"), "渲染应包含提示符");
+        assertTrue(rendered.contains("hi"));
+    }
+
+    @Test
+    void multilinesRenderEachWithAlignment() {
+        InputBox b = box();
+        b.insert("第一行\n第二行");
+        String rendered = b.render(40);
+        assertTrue(rendered.contains("第一行"));
+        assertTrue(rendered.contains("第二行"));
+        assertEquals(b.height(40), lineCount(rendered));
     }
 }

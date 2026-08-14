@@ -2,6 +2,7 @@ package com.jasoncode.ui.tui;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.TreeMap;
 
 /**
  * 全屏 TUI 屏幕模型（F3/F5/F9）：线程安全地持有对话历史区内容与排队项，
@@ -9,10 +10,10 @@ import java.util.List;
  */
 public final class ChatScreen {
 
-    /** 一次渲染结果：行 + 每行的鼠标命中目标（仅折叠块标题行非 null）。 */
-    public record Rendered(List<StyledLine> lines, List<CollapsibleBlock> hitTargets) {
+    /** 一次渲染结果：ANSI 样式内容字符串 + 每行（0-based 全局行号）对应的 CollapsibleBlock（仅标题行有值）。 */
+    public record Rendered(String content, TreeMap<Integer, CollapsibleBlock> headerLines) {
         public CollapsibleBlock targetAt(int line) {
-            return line >= 0 && line < hitTargets.size() ? hitTargets.get(line) : null;
+            return headerLines.get(line);
         }
     }
 
@@ -122,30 +123,48 @@ public final class ChatScreen {
     /** 渲染全部内容（历史项 + 队尾排队项），并给出鼠标命中映射。 */
     public Rendered render(int width) {
         synchronized (lock) {
-            List<StyledLine> lines = new ArrayList<>();
-            List<CollapsibleBlock> targets = new ArrayList<>();
+            StringBuilder content = new StringBuilder();
+            TreeMap<Integer, CollapsibleBlock> headerLines = new TreeMap<>();
+            int lineCount = 0;
+
             for (ScreenItem item : items) {
-                appendItem(item, width, lines, targets);
+                if (item instanceof CollapsibleBlock cb) {
+                    headerLines.put(lineCount, cb);
+                }
+                String rendered = item.render(width);
+                content.append(rendered);
+                lineCount += countLines(rendered);
             }
+
             if (!queued.isEmpty()) {
-                lines.add(StyledLine.empty());
-                targets.add(null);
+                content.append("\n");
+                lineCount++;
                 for (ScreenItem.QueuedItem q : queued) {
-                    appendItem(q, width, lines, targets);
+                    String rendered = q.render(width);
+                    content.append(rendered);
+                    lineCount += countLines(rendered);
                 }
             }
-            return new Rendered(lines, targets);
+
+            return new Rendered(content.toString(), headerLines);
         }
     }
 
-    private void appendItem(ScreenItem item, int width,
-                            List<StyledLine> lines, List<CollapsibleBlock> targets) {
-        List<StyledLine> rendered = item.render(width);
-        boolean headerPending = item instanceof CollapsibleBlock;
-        for (StyledLine line : rendered) {
-            lines.add(line);
-            targets.add(headerPending ? (CollapsibleBlock) item : null);
-            headerPending = false; // 仅首行（标题行）可点击
+    /** 计算字符串中的行数（以 \n 结尾的行计为一行；空字符串为 0 行）。 */
+    private static int countLines(String s) {
+        if (s.isEmpty()) {
+            return 0;
         }
+        int count = 0;
+        for (int i = 0; i < s.length(); i++) {
+            if (s.charAt(i) == '\n') {
+                count++;
+            }
+        }
+        // 如果最后一个字符不是 \n，则有一行没有结尾换行
+        if (s.charAt(s.length() - 1) != '\n') {
+            count++;
+        }
+        return count;
     }
 }

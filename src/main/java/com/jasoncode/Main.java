@@ -19,7 +19,7 @@ import com.jasoncode.ui.Banner;
 import com.jasoncode.ui.ConsoleUi;
 import com.jasoncode.ui.StreamRenderer;
 import com.jasoncode.ui.tui.ChatScreen;
-import com.jasoncode.ui.tui.LanternaTui;
+import com.jasoncode.ui.tui.Tui4jChat;
 import com.jasoncode.ui.tui.ScreenItem;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
@@ -104,10 +104,10 @@ public final class Main implements Callable<Integer> {
         } finally {
             terminal.close(); // 关闭 JLine 终端，让 Lanterna 重新接管（N8）
         }
-        return runFullScreen(providerConfig); // 交互：基于 Lanterna 的全屏 TUI
+        return runFullScreen(providerConfig); // 交互：基于 tui4j 的全屏 TUI
     }
 
-    /** 全屏 TUI（F3/F5/F9）：基于 Lanterna 的三区布局 + 异步对话引擎 + 输入队列。 */
+    /** 全屏 TUI（F3/F5/F9）：基于 tui4j 的三区布局 + 异步对话引擎 + 输入队列。 */
     private int runFullScreen(ProviderConfig providerConfig) throws IOException {
         ChatProvider provider = ProviderFactory.create(providerConfig);
         CommandRegistry registry = CommandRegistry.defaults();
@@ -121,7 +121,7 @@ public final class Main implements Callable<Integer> {
         }
         try (ChatEngine engine = new ChatEngine(provider, conversation.history(), screen)) {
             engine.start();
-            LanternaTui tui = new LanternaTui(screen, engine, registry,
+            Tui4jChat tui = new Tui4jChat(screen, engine, registry,
                     () -> statusLine(providerConfig, conversation));
             tui.run();
         }

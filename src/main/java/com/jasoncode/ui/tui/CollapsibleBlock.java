@@ -1,7 +1,7 @@
 package com.jasoncode.ui.tui;
 
-import java.util.ArrayList;
-import java.util.List;
+import com.williamcallahan.tui4j.compat.lipgloss.Style;
+import com.williamcallahan.tui4j.compat.lipgloss.color.Color;
 
 /**
  * 可折叠块（F5，可复用组件）：思考块、后续工具调用块共用。
@@ -10,6 +10,9 @@ import java.util.List;
  * 鼠标点击标题行可展开/收起详情）。正文以左边界线缩进区呈现，与顶层正文形成空间层级。
  */
 public final class CollapsibleBlock implements ScreenItem {
+
+    private static final Style YELLOW_BOLD = Style.newStyle().foreground(Color.color("3")).bold(true);
+    private static final Style DIM = Style.newStyle().foreground(Color.color("245"));
 
     private final String doneTitle;
     private final StringBuilder body = new StringBuilder();
@@ -46,22 +49,22 @@ public final class CollapsibleBlock implements ScreenItem {
     }
 
     @Override
-    public synchronized List<StyledLine> render(int width) {
-        List<StyledLine> lines = new ArrayList<>();
+    public synchronized String render(int width) {
+        StringBuilder sb = new StringBuilder();
         if (streaming) {
-            lines.add(StyledLine.styled(INDENT + "● 思考中...", Style.YELLOW_BOLD));
+            sb.append(YELLOW_BOLD.render(INDENT + "● 思考中...")).append("\n");
         } else {
-            lines.add(new StyledLine(List.of(
-                    new StyledSpan(INDENT, Style.DEFAULT),
-                    new StyledSpan((expanded ? "▾" : "▸") + " " + doneTitle, Style.YELLOW_BOLD),
-                    new StyledSpan("  （点击" + (expanded ? "收起" : "展开") + "）", Style.DIM))));
+            sb.append(INDENT);
+            sb.append(YELLOW_BOLD.render((expanded ? "▾" : "▸") + " " + doneTitle));
+            sb.append(DIM.render("  （点击" + (expanded ? "收起" : "展开") + "）"));
+            sb.append("\n");
         }
         if (streaming || expanded) {
             int bodyWidth = Math.max(2, width - TextWrap.width(INDENT + "│  "));
             for (String line : TextWrap.wrap(body.toString(), bodyWidth)) {
-                lines.add(StyledLine.styled(INDENT + "│  " + line, Style.DIM));
+                sb.append(DIM.render(INDENT + "│  " + line)).append("\n");
             }
         }
-        return lines;
+        return sb.toString();
     }
 }

@@ -13,7 +13,7 @@
 - [x] 对话循环：正常轮次、失败回滚、命令分发行为正确（验证：`mvn test -Dtest=ConversationLoopTest` 通过）
 - [x] 全屏 TUI 模型层：宽度感知换行（CJK 双列）、可折叠块状态机（流式/收起/点击切换）、屏幕模型（queued 标记生命周期、思考→正文流转、鼠标命中映射）（验证：`mvn test -Dtest='TextWrapTest,CollapsibleBlockTest,ChatScreenTest'` 通过）
 - [x] Lanterna 全屏 TUI：`LanternaTui` 接管备用屏幕，统一处理键盘/鼠标/尺寸事件；输入聚焦模型；Ctrl+T 折叠块切换；架构上 `ui/tui` 层替换不影响 chat/provider/config 等 Agent 层
-- [x] Markdown 渲染：Assistant 回答区支持加粗/斜体/代码/列表/标题/块引用/链接的简易渲染（验证：`MarkdownRendererTest` 通过）
+- [x] Markdown 渲染：Assistant 回答区支持加粗/斜体/代码/列表/标题/块引用/链接/表格（GFM pipe table，含对齐与框线）的渲染（验证：`MarkdownRendererTest` 通过）
 - [x] 异步对话引擎：忙碌排队、消费时合并全部未消费 prompt、失败回滚保持角色交替（验证：`mvn test -Dtest=ChatEngineTest` 通过）
 
 ## 集成

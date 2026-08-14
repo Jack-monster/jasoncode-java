@@ -5,7 +5,9 @@ import com.jasoncode.provider.ChatMessage;
 import com.jasoncode.provider.ChatProvider;
 import com.jasoncode.provider.Role;
 import com.jasoncode.provider.StreamEventListener;
+import com.williamcallahan.tui4j.term.TerminalInfo;
 import com.jasoncode.ui.tui.ChatScreen;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -23,6 +25,11 @@ import static org.junit.jupiter.api.Assertions.fail;
  * 失败回滚 user 消息保持角色交替。
  */
 class ChatEngineTest {
+
+    @BeforeAll
+    static void setupTerminalInfo() {
+        TerminalInfo.provide(() -> new TerminalInfo(false, null));
+    }
 
     /** 受控 Provider：每轮请求挂起，直到测试侧手动 complete。 */
     static final class FakeProvider implements ChatProvider {
@@ -101,8 +108,7 @@ class ChatEngineTest {
             provider.futures.get(0).completeExceptionally(new RuntimeException("boom"));
             waitFor(() -> history.snapshot().isEmpty()); // user 消息已回滚（保持角色交替）
             // 错误进入历史区展示
-            boolean shown = screen.render(80).lines().stream()
-                    .anyMatch(line -> line.plain().contains("boom"));
+            boolean shown = screen.render(80).content().contains("boom");
             assertTrue(shown);
         }
     }
